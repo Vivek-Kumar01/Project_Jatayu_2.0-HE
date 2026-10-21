@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 # ------------------------------------------------------------------------------
 with open(os.devnull, 'w', encoding='utf-8') as fnull:
     with redirect_stdout(fnull):
-        import artemis_uav as uav
+        import jatayu_uav as uav
         import mission_settings as ms
 
 PHASE_MODULE_NAMES = [
@@ -48,8 +48,8 @@ ms.battery_capacity = 22.0  # kWh fixed
 ms.mass_cells = ms.battery_capacity * 1000.0 / uav.specific_energy_battery
 ms.mass_battery_pack = uav.k_bat_pack * ms.mass_cells
 
-# Sweep DoH_P from 0.20 up to 0.75 to capture the turning point
-DOH_P_SWEEP = np.linspace(0.20, 0.75, 15)
+# Sweep DoH_P from 0.20 up to 0.55 to capture the turning point
+DOH_P_SWEEP = np.linspace(0.20, 0.55, 15)
 sweep_records = []
 
 print("=" * 96)

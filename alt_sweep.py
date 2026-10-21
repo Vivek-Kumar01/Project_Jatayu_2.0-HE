@@ -10,7 +10,7 @@ import matplotlib.pyplot as plt
 # ------------------------------------------------------------------------------
 with open(os.devnull, 'w', encoding='utf-8') as fnull:
     with redirect_stdout(fnull):
-        import artemis_uav as uav
+        import jatayu_uav as uav
         import mission_settings as ms
 
 PHASE_MODULE_NAMES = [

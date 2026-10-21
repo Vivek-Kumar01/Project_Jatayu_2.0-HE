@@ -1,5 +1,5 @@
 import math
-import artemis_uav as uav
+import jatayu_uav as uav
 
 # UAV constraints and parameters
 SoC_min = 0.2  # Minimum state of charge for battery pack

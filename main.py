@@ -1,6 +1,6 @@
 import pandas as pd
 import matplotlib.pyplot as plt
-import artemis_uav as uav
+import jatayu_uav as uav
 import mission_settings as ms
 
 # ------------------------------------------------------------------------------

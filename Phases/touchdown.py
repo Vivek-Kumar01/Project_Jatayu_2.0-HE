@@ -1,5 +1,5 @@
 from ambiance import Atmosphere
-import artemis_uav as uav
+import jatayu_uav as uav
 import mission_settings as ms
 import Phases.flare as fl
 
@@ -29,7 +29,8 @@ WARNING: Idling power percentage is too low, unable to power avionics. Increase 
 ''')
 
 Cd_0_land = fl.Cd0_land
-Cl = uav.Cl_ground
+delta_Cl_flaps = 0.40  # or uav.delta_Cl_flaps
+Cl = uav.Cl_ground + delta_Cl_flaps
 Cd = Cd_0_land + ms.K_grd * Cl**2
 mu_r = 0.4
 
