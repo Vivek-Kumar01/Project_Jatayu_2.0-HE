@@ -1,5 +1,7 @@
 # This contains the parameters for the UAV.
 import math
+import numpy as np
+from ambiance import Atmosphere
 
 # Fixed masses
 MTOW = 1000 #kg
@@ -82,3 +84,31 @@ eta_DCDC_conv = 0.95 # DCDC converter efficiency
 # Landing characteristics
 max_landing_mass_percent = 100  # %
 max_landing_mass = (max_landing_mass_percent/100) * MTOW
+
+
+# Baseline reference constants
+rho_0 = 1.2250  # kg/m^3 (ISA Sea Level)
+
+def get_ice_available_power(h_m, P_rated=P_ICE_rated):
+    """
+    Computes naturally aspirated CI aero-engine brake power (kW) at altitude h_m.
+    Applies the classic Gagg-Farrar density derating formulation.
+    """
+    atmos = Atmosphere(h_m)
+    rho = float(atmos.density[0]) if hasattr(atmos.density, '__len__') else float(atmos.density)
+    sigma = rho / rho_0
+    factor = 1.132 * sigma - 0.132
+    return max(0.0, P_rated * factor)
+
+def get_ice_bsfc(P_brake_kW, P_avail_kW):
+    """
+    Brake Specific Fuel Consumption (BSFC) in g/kWh for a 4-stroke CI aero-engine
+    governed at constant 3800 crankshaft RPM (constant-speed propeller).
+    Anchors: minimum 225 g/kWh at xi = 0.70; 245 g/kWh at xi = 1.00.
+    """
+    if P_avail_kW <= 0.0 or P_brake_kW <= 0.0:
+        return 340.0  # Motoring / unpowered idle limit
+
+    xi = float(np.clip(P_brake_kW / P_avail_kW, 0.05, 1.0))
+    bsfc = 222.2 * (xi ** 2) - 311.1 * xi + 333.9
+    return float(np.clip(bsfc, BSFC_ICE_opt, BSFC_ICE_low))

@@ -163,7 +163,7 @@ else:
   )
   print(
         f"  Specific Power DC-DC: {uav.sp_power_DCDC:>8.2f} kW/kg│  DC-DC Rated"
-        f" Power:  {P_DCDC_rated:>8.2f} W"
+        f" Power:  {P_DCDC_rated:>8.2f} kW"
     )
   print("=" * 82)
   print(f"{'PRE-FLIGHT AUDIT VERIFIED: AIRCRAFT GO FOR FLIGHT':^82}")
@@ -194,29 +194,34 @@ loiter_altitude = cruise_altitude #m
 
 
 # ==============================================================================
-# MISSION TELEMETRY RECORDER (For Visualisation & Optimization Sweeps)
+# MISSION TELEMETRY RECORDER (Expanded for Hybrid ICE BSFC Integration)
 # ==============================================================================
 telemetry = {
     'time_s': [],
     'phase': [],
     'altitude_m': [],
     'velocity_ms': [],
-    'P_req_kW': [],  # Aerodynamic Drag * Velocity / Prop_eff
+    'P_req_kW': [],
     'P_ICE_kW': [],
     'P_EM_kW': [],
     'fuel_mass_kg': [],
     'battery_soc': [],
+    'xi_ICE': [],       # Engine throttle / load fraction (P_brake / P_avail)
+    'BSFC_g_kWh': [],   # Instantaneous BSFC [g/kWh]
+    'm_dot_fuel_gps': [] # Fuel burn rate [g/s]
 }
 
-
-def log_telemetry(t, phase, alt, v, p_req, p_ice, p_em, fuel, soc):
-  """Appends one instantaneous simulation step to the telemetry log."""
-  telemetry['time_s'].append(t)
-  telemetry['phase'].append(phase)
-  telemetry['altitude_m'].append(alt)
-  telemetry['velocity_ms'].append(v)
-  telemetry['P_req_kW'].append(p_req)
-  telemetry['P_ICE_kW'].append(p_ice)
-  telemetry['P_EM_kW'].append(p_em)
-  telemetry['fuel_mass_kg'].append(fuel)
-  telemetry['battery_soc'].append(soc)
+def log_telemetry(t, phase, alt, v, p_req, p_ice, p_em, fuel, soc, xi_ice, bsfc, m_dot_fuel):
+    """Appends one instantaneous simulation step to the telemetry log."""
+    telemetry['time_s'].append(t)
+    telemetry['phase'].append(phase)
+    telemetry['altitude_m'].append(alt)
+    telemetry['velocity_ms'].append(v)
+    telemetry['P_req_kW'].append(p_req)
+    telemetry['P_ICE_kW'].append(p_ice)
+    telemetry['P_EM_kW'].append(p_em)
+    telemetry['fuel_mass_kg'].append(fuel)
+    telemetry['battery_soc'].append(soc)
+    telemetry['xi_ICE'].append(xi_ice)
+    telemetry['BSFC_g_kWh'].append(bsfc)
+    telemetry['m_dot_fuel_gps'].append(m_dot_fuel)

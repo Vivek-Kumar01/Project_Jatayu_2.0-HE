@@ -4,75 +4,102 @@ import jatayu_uav as uav
 import mission_settings as ms
 import Phases.takeoff as to
 
-m_initial = to.m
-SoC = to.SoC  # Initial state of charge for battery pack
-m = to.m  # Initial mass of the UAV after takeoff
+# ------------------------------------------------------------------------------
+# 1. INITIALIZE FROM TAKEOFF END-OF-PHASE STATE
+# ------------------------------------------------------------------------------
+m_initial = float(to.m)
+m = float(to.m)
+SoC = float(to.SoC)
+h = float(to.h)
+V = float(getattr(to, 'final_velocity', to.V_LO))
+s_roll = float(to.s_roll)
 
-h = to.h
-
-# Phase 1
-rho = Atmosphere(h).density[0]  # kg/m^3
 t_step = 0.1  # seconds
-
-P_ICE_full = uav.P_ICE_rated * ((1.132 * rho / Atmosphere(0).density[0]) - 0.132)  # kW
-
-P_ICE_avionics = ms.power_avionics / uav.eta_alternator  # kW
-P_ICE_full = P_ICE_full - P_ICE_avionics  # kW
-
-P_electric_full = (min(ms.power_battery_discharge, ms.power_inverter/uav.eta_inverter))*uav.eta_inverter*uav.eta_motor  # kW
-
-percent_ICE_power = 1 # Percentage of ICE power
-percent_electric_power = 1 # Percentage of electric power
-
-P_ICE = percent_ICE_power * P_ICE_full  # kW
-P_electric = percent_electric_power * P_electric_full  # kW
-
-
-DoH = P_electric / (P_ICE + P_electric)  # Hybridization factor (0 = pure ICE, 1 = pure electric)
-P_shaft_prop = P_ICE * uav.eta_gearbox_ICE + P_electric  # kW
-
+theta = 6.5   # Climb angle [degrees]
+Cd_0_p1 = uav.Cd_0 + ms.delta_CD_0 + ms.delta_CD_0_flap
 eta_prop = 0.68
 
-P_available = P_shaft_prop * eta_prop  # kW
+# ------------------------------------------------------------------------------
+# 2. POWERTRAIN RATING & DERATING AT SCREEN HEIGHT
+# ------------------------------------------------------------------------------
+rho = float(Atmosphere(h).density[0])  # kg/m^3
+P_ICE_avail = uav.get_ice_available_power(h)
 
-theta = 6.5 # degrees, climb angle
-Cd_0_p1 = uav.Cd_0 + ms.delta_CD_0 + ms.delta_CD_0_flap
+# Continuous electrical parasitics drawn via engine-driven alternator
+P_ICE_avionics = ms.power_avionics / uav.eta_alternator  # kW
+P_ICE_full = max(0.0, P_ICE_avail - P_ICE_avionics)     # kW
 
-V = to.V  # m/s
-s_roll = to.s_roll  # m
-t = 0
+# Electric propulsion boost limits
+P_electric_full = (
+    min(ms.power_battery_discharge, ms.power_inverter / uav.eta_inverter)
+    * uav.eta_inverter
+    * uav.eta_motor
+)  # kW
 
+percent_ICE_power = 1.0       # Full throttle ICE
+percent_electric_power = 1.0  # Full electric assist during obstacle clearance
+
+P_ICE = percent_ICE_power * P_ICE_full
+P_electric = percent_electric_power * P_electric_full
+
+DoH = P_electric / (P_ICE + P_electric) if (P_ICE + P_electric) > 0.0 else 0.0
+P_shaft_prop = (P_ICE * uav.eta_gearbox_ICE) + P_electric  # kW
+P_available = P_shaft_prop * eta_prop                      # kW (thrust power)
+
+# ------------------------------------------------------------------------------
+# 3. ENGINE LOAD & FUEL CONSUMPTION METRICS
+# ------------------------------------------------------------------------------
+P_ICE_brake_total = P_ICE + P_ICE_avionics  # Total crankshaft brake demand [kW]
+xi_ICE = min(1.0, P_ICE_brake_total / P_ICE_avail) if P_ICE_avail > 0.0 else 0.0
+bsfc_pullup = uav.get_ice_bsfc(P_ICE_brake_total, P_ICE_avail)  # g/kWh
+m_dot_fuel_gps = (P_ICE_brake_total * bsfc_pullup) / 3600.0     # g/s
+
+# ------------------------------------------------------------------------------
+# 4. TIME-MARCHING PULL-UP INTEGRATION (Climb to 15 m Obstacle Height)
+# ------------------------------------------------------------------------------
+t = 0.0
 Phase_Success = True
 
 while h < ms.obstacle_height:
+    # Update atmospheric density with altitude
+    rho = float(Atmosphere(h).density[0])
+
     L = m * 9.81 * math.cos(math.radians(theta))  # N
-    Cl = L / (0.5 * rho * V**2 * uav.S)
-    Cd = Cd_0_p1 + uav.K * Cl**2
-    D = 0.5 * rho * V**2 * uav.S * Cd  # N
-    T = P_available * 1000 / V  # N
-    F_net = T - D - m * 9.81 * math.sin(math.radians(theta))  # N
-    a_net = F_net / m  # m/s^2
+    Cl = L / (0.5 * rho * (V ** 2) * uav.S)
+    Cd = Cd_0_p1 + uav.K * (Cl ** 2)
+    D = 0.5 * rho * (V ** 2) * uav.S * Cd         # N
+    T = (P_available * 1000.0) / V                # N
+    F_net = T - D - (m * 9.81 * math.sin(math.radians(theta)))  # N
+    a_net = F_net / m                             # m/s^2
 
-    V = V + a_net * t_step  # m/s
-    h = h + V * math.sin(math.radians(theta)) * t_step  # m
-    t = t + t_step  # seconds
-    s_roll = s_roll + V * math.cos(math.radians(theta)) * t_step  # m
+    # Fuel mass consumed in step (propulsion + avionics alternator)
+    m_fuel_step_kg = (m_dot_fuel_gps * t_step) / 1000.0  # kg
 
-    m_fuel = (P_ICE * (uav.BSFC_ICE_max / 3600)) * t_step / 1000  # kg
-    elec_energy_used = ((P_electric/(uav.eta_inverter*uav.eta_motor*uav.eta_discharge)) * t_step) / 3600  # kWh
+    # Electrical energy extracted from battery (including inverter, motor, discharge loss)
+    elec_power_battery_bus = P_electric / (uav.eta_inverter * uav.eta_motor * uav.eta_discharge)  # kW
+    elec_energy_step_kWh = (elec_power_battery_bus * t_step) / 3600.0  # kWh
 
-    SoC = SoC - (elec_energy_used / ms.battery_capacity)
-    m = m - m_fuel - ((P_ICE_avionics * uav.BSFC_ICE_max / 3600) * t_step / 1000)  # kg
+    # State advancement
+    V += a_net * t_step
+    h += V * math.sin(math.radians(theta)) * t_step
+    t += t_step
+    s_roll += V * math.cos(math.radians(theta)) * t_step
 
-    # --- TELEMETRY LOGGING (Pull-Up) ---
-    fuel_remaining = m - (uav.MTOW - ms.mass_fuel * (1 - ms.reserve_fuel))
+    m -= m_fuel_step_kg
+    SoC -= (elec_energy_step_kWh / ms.battery_capacity)
+
+    # Telemetry logging
+    fuel_remaining = m - ms.m_zfw
     P_req = (D * V) / 1000.0  # kW
-    cumulative_time = (to.t + to.N) + t
-    ms.log_telemetry(cumulative_time, 'Pull_Up', h, V, P_req, P_ICE, P_electric, fuel_remaining, SoC)
+    cumulative_time = float(getattr(to, 'cumulative_time', to.t + to.N)) + t
+    ms.log_telemetry(
+        cumulative_time, 'Pull_Up', h, V, P_req, P_ICE, P_electric,
+        fuel_remaining, SoC, xi_ICE, bsfc_pullup, m_dot_fuel_gps
+    )
 
     if h < ms.obstacle_height and s_roll > ms.max_permissible_stot:
         print('''
-        Error: Ground roll distance exceeded maximum permissible limit.
+        Error: Horizontal distance exceeded maximum permissible limit to 15 m obstacle.
         MISSION FAILED.
         ''')
         Phase_Success = False
@@ -86,7 +113,7 @@ while h < ms.obstacle_height:
         Phase_Success = False
         break
 
-    if m < uav.MTOW - ms.mass_fuel * (1 - ms.reserve_fuel):
+    if m < ms.m_zfw:
         print('''
         Error: Insufficient fuel remaining for mission.
         MISSION FAILED.
@@ -94,31 +121,33 @@ while h < ms.obstacle_height:
         Phase_Success = False
         break
 
+# ------------------------------------------------------------------------------
+# 5. EXPORT VARIABLES FOR DOWNSTREAM PHASES (Phases/climb.py)
+# ------------------------------------------------------------------------------
+cumulative_time = float(getattr(to, 'cumulative_time', to.t + to.N)) + t
+cumulative_distance = s_roll
+final_mass = m
+final_velocity = V
+final_altitude = h
+final_SoC = SoC
 
 if Phase_Success:
     print(f'''
-    -------Pull Up Successful-------
-    P_ICE: {P_ICE:.2f} kW, P_electric: {P_electric:.2f} kW, DoH: {DoH:.2f}
-    Total phase 1 climb time: {t:.2f} seconds
-    Total horizontal distance to clear obstacle: {s_roll:.2f} meters
-    Final speed: {V:.2f} m/s
-    Final altitude: {h:.2f} meters
-    Fuel Burned: {(m_initial - m)*1000:.2f} g
-    Remaining fuel mass: {m - (uav.MTOW - ms.mass_fuel * (1 - ms.reserve_fuel)):.2f} kg
-    Remaining battery SoC: {SoC:.2%}
-    ''')
-
-if not Phase_Success:
+    ------- Pull Up Successful -------
+    P_ICE: {P_ICE:.2f} kW | Load Ratio (xi): {xi_ICE:.2f} | BSFC: {bsfc_pullup:.1f} g/kWh
+    P_electric: {P_electric:.2f} kW | Shaft Power: {P_shaft_prop:.2f} kW | DoH: {DoH*100:.1f} %
+    Total Phase Climb Time: {t:.2f} seconds
+    Total Distance to Clear Obstacle: {s_roll:.2f} meters (Limit: {ms.max_permissible_stot:.0f} m)
+    Final Velocity: {V:.2f} m/s ({V*3.6:.1f} km/h)
+    Final Altitude: {h:.2f} meters
+    Fuel Burned: {(m_initial - m)*1000.0:.2f} g (Rate: {m_dot_fuel_gps:.2f} g/s)
+    Usable Fuel Remaining: {fuel_remaining - ms.mass_reserve:.2f} kg
+    Remaining Battery SoC: {SoC*100.0:.2f} %\n''')
+else:
     print(f'''
-    -------Pull Up Failed-------
-    P_ICE: {P_ICE:.2f} kW, P_electric: {P_electric:.2f} kW, DoH: {DoH:.2f}
-    Total phase 1 climb time: {t:.2f} seconds
-    Total horizontal distance to clear obstacle: {s_roll:.2f} meters
-    Final speed: {V:.2f} m/s
-    Final altitude: {h:.2f} meters
-    Fuel Burned: {(m_initial - m)*1000:.2f} g
-    Remaining fuel mass: {m - (uav.MTOW - ms.mass_fuel * (1 - ms.reserve_fuel)):.2f} kg
-    Remaining battery SoC: {SoC:.2%}
-    ''')
-
-
+    ------- Pull Up Failed -------
+    P_ICE: {P_ICE:.2f} kW | P_electric: {P_electric:.2f} kW
+    Total Phase Climb Time: {t:.2f} seconds
+    Total Distance: {s_roll:.2f} meters
+    Final Speed: {V:.2f} m/s | Altitude: {h:.2f} m
+    Battery SoC: {SoC*100.0:.2f} %\n''')

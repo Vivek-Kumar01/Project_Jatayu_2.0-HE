@@ -7,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ------------------------------------------------------------------------------
-# 0. SUPPRESS INITIAL PRINTOUTS ON IMPORT (WITH UTF-8 COMPATIBILITY)
+# 0. SUPPRESS INITIAL PRINTOUTS ON IMPORT
 # ------------------------------------------------------------------------------
 with open(os.devnull, 'w', encoding='utf-8') as fnull:
     with redirect_stdout(fnull):
@@ -29,31 +29,29 @@ PHASE_MODULE_NAMES = [
 ]
 
 # ------------------------------------------------------------------------------
-# BASELINE CALIBRATION ANCHORS (Dynamically sampled from source files)
+# BASELINE CALIBRATION ANCHORS
 # ------------------------------------------------------------------------------
 P_ICE_BASE      = float(uav.P_ICE_rated)
 P_EM_BASE       = float(ms.power_motor)
 P_TOTAL_TAKEOFF = P_ICE_BASE + P_EM_BASE
 
-# Core dry block + cooling/exhaust/mounting accessories
 M_ICE_INST_BASE = float(uav.M_ICE_dry + uav.M_ICE_accessories)
 
-# Baseline BSFC map points
 BSFC_OPT_BASE   = float(uav.BSFC_ICE_opt)
 BSFC_MAX_BASE   = float(uav.BSFC_ICE_max)
 BSFC_LOW_BASE   = float(uav.BSFC_ICE_low)
 
-# Fixed energy storage baseline
-ms.battery_capacity = 22.0  # kWh fixed
-ms.mass_cells = ms.battery_capacity * 1000.0 / uav.specific_energy_battery
+# Fixed baseline energy storage (22 kWh pack)
+ms.battery_capacity = 22.0  # kWh
+ms.mass_cells = (ms.battery_capacity * 1000.0) / uav.specific_energy_battery
 ms.mass_battery_pack = uav.k_bat_pack * ms.mass_cells
 
-# Sweep DoH_P from 0.20 up to 0.55 to capture the turning point
+# Sweep DoH_P from 0.20 to 0.55
 DOH_P_SWEEP = np.linspace(0.20, 0.55, 15)
 sweep_records = []
 
 print("=" * 96)
-print(f"{'PROJECT ARTEMIS 2.0: POWER HYBRIDIZATION SWEEP (DoH_P vs. MISSION LOITER)':^96}")
+print(f"{'PROJECT JATAYU 2.0 - HE: POWER HYBRIDIZATION SWEEP (DoH_P vs. MISSION LOITER)':^96}")
 print("=" * 96)
 
 for idx, doh_p in enumerate(DOH_P_SWEEP):
@@ -106,12 +104,25 @@ for idx, doh_p in enumerate(DOH_P_SWEEP):
     uav.BSFC_ICE_max = BSFC_MAX_BASE * bsfc_scale
     uav.BSFC_ICE_low = BSFC_LOW_BASE * bsfc_scale
 
+    # Dynamically scale the BSFC function polynomial in jatayu_uav
+    def make_scaled_bsfc_func(scale_factor):
+        def dynamic_bsfc(P_brake_kW, P_avail_kW):
+            if P_avail_kW <= 0.0 or P_brake_kW <= 0.0:
+                return uav.BSFC_ICE_low
+            xi = float(np.clip(P_brake_kW / P_avail_kW, 0.05, 1.0))
+            base_curve = (222.2 * (xi ** 2) - 311.1 * xi + 333.9)
+            return float(np.clip(base_curve * scale_factor, uav.BSFC_ICE_opt, uav.BSFC_ICE_low))
+        return dynamic_bsfc
+
+    uav.get_ice_bsfc = make_scaled_bsfc_func(bsfc_scale)
+
     # --------------------------------------------------------------------------
-    # 4. RESET TELEMETRY BUFFER
+    # 4. RESET TELEMETRY BUFFER (Full 12-Channel Schema)
     # --------------------------------------------------------------------------
     ms.telemetry = {
         'time_s': [], 'phase': [], 'altitude_m': [], 'velocity_ms': [],
-        'P_req_kW': [], 'P_ICE_kW': [], 'P_EM_kW': [], 'fuel_mass_kg': [], 'battery_soc': []
+        'P_req_kW': [], 'P_ICE_kW': [], 'P_EM_kW': [], 'fuel_mass_kg': [], 'battery_soc': [],
+        'xi_ICE': [], 'BSFC_g_kWh': [], 'm_dot_fuel_gps': []
     }
 
     # --------------------------------------------------------------------------
@@ -127,7 +138,6 @@ for idx, doh_p in enumerate(DOH_P_SWEEP):
                     mod = importlib.import_module(mod_name)
                     importlib.reload(mod)
 
-                    # Inspect the standardized Phase_Success boolean
                     phase_ok = getattr(mod, 'Phase_Success', True)
                     if not phase_ok:
                         sim_failed = True
@@ -144,7 +154,7 @@ for idx, doh_p in enumerate(DOH_P_SWEEP):
         continue
 
     # --------------------------------------------------------------------------
-    # 6. EXTRACT MISSION METRICS (Only reached if all 11 phases passed)
+    # 6. EXTRACT MISSION METRICS
     # --------------------------------------------------------------------------
     df_sim = pd.DataFrame(ms.telemetry)
     total_hr = df_sim['time_s'].iloc[-1] / 3600.0
@@ -171,13 +181,16 @@ for idx, doh_p in enumerate(DOH_P_SWEEP):
 # ------------------------------------------------------------------------------
 # 7. EXPORT DATA & DUAL-AXIS TRADE-OFF PLOT (DoH_P)
 # ------------------------------------------------------------------------------
+if not sweep_records:
+    print("\nError: All sweep design configurations failed or were skipped.")
+    exit(1)
+
 df_res = pd.DataFrame(sweep_records)
 df_res.to_csv('hardware_sweep_doh_p_results.csv', index=False)
 print("\n--> Results saved to hardware_sweep_doh_p_results.csv")
 
 fig, ax1 = plt.subplots(figsize=(10, 6.2), dpi=300)
 
-# Colors
 color_ice = '#1F78B4'    # Navy/Steel Blue for Sustained ICE Loiter
 color_stare = '#33A02C'  # Forest Green for Silent Stare
 
@@ -215,11 +228,9 @@ ax2.tick_params(axis='y', labelcolor=color_stare)
 MIN_LOITER_HR = 12.0
 MIN_STARE_MIN = 30.0
 
-# Threshold lines
 line_t1 = ax1.axhline(MIN_LOITER_HR, color='#E31A1C', linestyle=':', lw=1.6, label=f'Req: Min Loiter ({MIN_LOITER_HR:.0f} hr)')
 line_t2 = ax2.axhline(MIN_STARE_MIN, color='#6A3D9A', linestyle=':', lw=1.6, label=f'Req: Min Stare ({MIN_STARE_MIN:.0f} min)')
 
-# Shading Feasible Regions
 y1_max = max(df_res['Sustained_Loiter_hr'].max() * 1.08, MIN_LOITER_HR + 4.0)
 ax1.set_ylim(bottom=0.0, top=y1_max)
 ax1.axhspan(MIN_LOITER_HR, y1_max, color='#33A02C', alpha=0.07, label='Compliant Standoff Loiter Region (≥12 hr)')
@@ -252,13 +263,12 @@ handles2, labels2 = ax2.get_legend_handles_labels()
 ax1.legend(handles1 + handles2, labels1 + labels2, loc='upper center', bbox_to_anchor=(0.5, 0.95),
            framealpha=0.92, fontsize=8.5, ncol=2)
 
-plt.title('Project Artemis 2.0: Power Hybridization Envelope ($DoH_P$)', fontweight='bold', fontsize=13, pad=38)
+plt.title('Project Jatayu 2.0 - HE: Power Hybridization Envelope ($DoH_P$)', fontweight='bold', fontsize=13, pad=38)
 
-# Fully parametric text pulling from uav and ms constants
 plt.figtext(
     0.5, 0.015,
-    f"Held Constant: Installed Takeoff Shaft Power = {P_TOTAL_TAKEOFF:.1f} kW ($P_{{ICE}} + P_{{EM}}$)  |  "
-    f"Battery Pack Energy = {ms.battery_capacity:.1f} kWh",
+    f"Held Constant: Takeoff Power = {P_TOTAL_TAKEOFF:.1f} kW ($P_{{ICE}} + P_{{EM}}$)  |  "
+    f"Battery Capacity = {ms.battery_capacity:.1f} kWh",
     ha='center', fontsize=9.5, style='italic',
     bbox=dict(boxstyle='square,pad=0.4', facecolor='#F0F0F0', edgecolor='#CCCCCC', lw=0.8)
 )

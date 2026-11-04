@@ -1,4 +1,5 @@
 import os
+import math
 import importlib
 from contextlib import redirect_stdout
 import numpy as np
@@ -6,7 +7,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 
 # ------------------------------------------------------------------------------
-# 0. SUPPRESS INITIAL PRINTOUTS ON IMPORT (WITH UTF-8 COMPATIBILITY)
+# 0. SUPPRESS INITIAL PRINTOUTS ON IMPORT
 # ------------------------------------------------------------------------------
 with open(os.devnull, 'w', encoding='utf-8') as fnull:
     with redirect_stdout(fnull):
@@ -28,8 +29,8 @@ PHASE_MODULE_NAMES = [
 ]
 
 # Baseline fixed hardware anchors
-P_ICE_BASE = float(uav.P_ICE_rated)
-P_EM_BASE  = float(ms.power_motor)
+P_ICE_BASE  = float(uav.P_ICE_rated)
+P_EM_BASE   = float(ms.power_motor)
 E_BATT_BASE = float(ms.battery_capacity)
 
 # Sweep altitude from 1,000 m to 5,500 m (MSL)
@@ -37,7 +38,7 @@ ALTITUDE_SWEEP_M = np.linspace(1000.0, 5500.0, 10)
 sweep_records = []
 
 print("=" * 96)
-print(f"{'PROJECT ARTEMIS 2.0: ALTITUDE SENSITIVITY SWEEP (h vs. MISSION LOITER)':^96}")
+print(f"{'PROJECT JATAYU 2.0 - HE: ALTITUDE SENSITIVITY SWEEP (h vs. MISSION LOITER)':^96}")
 print("=" * 96)
 
 for idx, alt_m in enumerate(ALTITUDE_SWEEP_M):
@@ -48,11 +49,12 @@ for idx, alt_m in enumerate(ALTITUDE_SWEEP_M):
     ms.loiter_altitude = float(alt_m)
 
     # --------------------------------------------------------------------------
-    # 2. RESET TELEMETRY BUFFER
+    # 2. RESET TELEMETRY BUFFER (Full 12-Channel Schema)
     # --------------------------------------------------------------------------
     ms.telemetry = {
         'time_s': [], 'phase': [], 'altitude_m': [], 'velocity_ms': [],
-        'P_req_kW': [], 'P_ICE_kW': [], 'P_EM_kW': [], 'fuel_mass_kg': [], 'battery_soc': []
+        'P_req_kW': [], 'P_ICE_kW': [], 'P_EM_kW': [], 'fuel_mass_kg': [], 'battery_soc': [],
+        'xi_ICE': [], 'BSFC_g_kWh': [], 'm_dot_fuel_gps': []
     }
 
     # --------------------------------------------------------------------------
@@ -95,19 +97,28 @@ for idx, alt_m in enumerate(ALTITUDE_SWEEP_M):
     df_loiter = df_sim[df_sim['phase'] == 'Sustained_Loiter']
     t_loiter_hr = ((df_loiter['time_s'].iloc[-1] - df_loiter['time_s'].iloc[0]) / 3600.0) if not df_loiter.empty else 0.0
 
+    df_ice = df_sim[df_sim['P_ICE_kW'] > 0.5]
+    avg_bsfc = df_ice['BSFC_g_kWh'].mean() if not df_ice.empty else 0.0
+
     sweep_records.append({
         'Altitude_m': alt_m,
         'Altitude_ft': alt_m * 3.28084,
         'Total_Endurance_hr': total_hr,
         'Sustained_Loiter_hr': t_loiter_hr,
-        'Silent_Stare_min': t_silent_min
+        'Silent_Stare_min': t_silent_min,
+        'Mean_BSFC_g_kWh': avg_bsfc
     })
 
-    print(f"[{idx+1:02d}/{len(ALTITUDE_SWEEP_M):02d}] Alt: {alt_m:5.0f} m ({alt_m*3.28084:5.0f} ft) | Loiter: {t_loiter_hr:5.2f} hr | Silent: {t_silent_min:5.1f} min | Tot: {total_hr:5.2f} hr")
+    print(f"[{idx+1:02d}/{len(ALTITUDE_SWEEP_M):02d}] Alt: {alt_m:5.0f} m ({alt_m*3.28084:5.0f} ft) | "
+          f"Loiter: {t_loiter_hr:5.2f} hr | Silent: {t_silent_min:5.1f} min | BSFC: {avg_bsfc:5.1f} g/kWh | Tot: {total_hr:5.2f} hr")
 
 # ------------------------------------------------------------------------------
-# 5. EXPORT DATA & DUAL-AXIS TRADE-OFF PLOT
+# 5. EXPORT DATA & DUAL-AXIS SENSITIVITY PLOT
 # ------------------------------------------------------------------------------
+if not sweep_records:
+    print("\nError: All altitude design points failed or were skipped.")
+    exit(1)
+
 df_res = pd.DataFrame(sweep_records)
 df_res.to_csv('altitude_sweep_results.csv', index=False)
 print("\n--> Results saved to altitude_sweep_results.csv")
@@ -160,7 +171,7 @@ y2_max = max(df_res['Silent_Stare_min'].max() * 1.25, MIN_STARE_MIN + 10.0)
 ax2.set_ylim(bottom=0.0, top=y2_max)
 ax2.axhspan(MIN_STARE_MIN, y2_max, color='#6A3D9A', alpha=0.07, label='Compliant Silent Stare Region (≥30 min)')
 
-# Secondary Top X-Axis: Feet
+# Secondary Top X-Axis: Altitude in Feet
 alt_m_vals = df_res['Altitude_m'].values
 alt_ft_vals = df_res['Altitude_ft'].values
 
@@ -180,9 +191,8 @@ handles2, labels2 = ax2.get_legend_handles_labels()
 ax1.legend(handles1 + handles2, labels1 + labels2, loc='upper center', bbox_to_anchor=(0.5, 0.95),
            framealpha=0.92, fontsize=8.5, ncol=2)
 
-plt.title('Project Artemis 2.0: Altitude Sensitivity Envelope ($h$)', fontweight='bold', fontsize=13, pad=38)
+plt.title('Project Jatayu 2.0 - HE: Altitude Sensitivity Envelope ($h$)', fontweight='bold', fontsize=13, pad=38)
 
-# Explanatory Invariant Footer
 plt.figtext(
     0.5, 0.015,
     f"Held Constant: ICE = {P_ICE_BASE:.0f} kW  |  EM = {P_EM_BASE:.0f} kW  |  "
