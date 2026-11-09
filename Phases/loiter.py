@@ -11,10 +11,16 @@ t_step = 1.0  # seconds
 h = float(ms.loiter_altitude)
 rho = float(Atmosphere(h).density[0])  # kg/m^3
 
+# Standoff orbit bank angle (continuous 20 deg circle)
+phi_orbit = math.radians(20.0)
+n_load = 1.0 / math.cos(phi_orbit)  # n ~ 1.0642
+
 safe_margin = 1.25  # Ratio of loiter velocity to stall velocity
-cl_loiter = uav.Cl_max_clean / (safe_margin ** 2)
-cd_loiter = uav.Cd_0 + uav.K * (cl_loiter ** 2)
-n_prop = 0.72  # Propeller efficiency at low-speed loiter advance ratio
+cl_opt_endurance = math.sqrt(3.0 * uav.Cd_0 / uav.K)
+cl_loiter = min(cl_opt_endurance, uav.Cl_max_clean / (safe_margin ** 2))
+# Effective drag polar during turn
+cd_loiter = uav.Cd_0 + uav.K * ((cl_loiter * n_load) ** 2)
+n_prop = 0.66  # Propeller efficiency at low-speed loiter advance ratio
 
 # Atmospheric derating for ICE at loiter altitude
 P_ICE_avail = uav.get_ice_available_power(h)
