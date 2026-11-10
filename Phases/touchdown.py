@@ -139,7 +139,7 @@ if Phase_Success:
     Total Ground Roll Distance: {s_land_roll:.2f} m (Limit: {ms.max_permissible_sroll:.0f} m)
     Time to Full Stop: {t:.2f} seconds
     Fuel Burned During Rollout: {m_fuel_burned*1000.0:.2f} g
-    Unused Usable Fuel: {fuel_remaining - ms.mass_reserve:.2f} kg
+    Unused Usable Fuel: {fuel_remaining:.2f} kg
     Untouched Safety Reserve Fuel: {ms.mass_reserve:.2f} kg
     Final Battery SoC: {SoC*100.0:.2f} %
     ======================================================================

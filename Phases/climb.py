@@ -138,7 +138,7 @@ if Phase_Success:
     Final Altitude: {h:.2f} m (Target: {h_target:.1f} m)
     Final Velocity: {V:.2f} m/s ({V*3.6:.1f} km/h)
     Fuel Burned: {(m_initial - m):.2f} kg
-    Usable Fuel Remaining: {fuel_remaining - ms.mass_reserve:.2f} kg
+    Usable Fuel Remaining: {fuel_remaining:.2f} kg
     Remaining Battery SoC: {SoC*100.0:.2f} %\n''')
 else:
     print(f'''

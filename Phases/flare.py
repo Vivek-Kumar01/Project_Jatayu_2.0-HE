@@ -158,7 +158,7 @@ if Phase_Success:
     Touchdown Speed: {V_touchdown:.2f} m/s ({V_touchdown*3.6:.1f} km/h)
     Final Aircraft Mass: {m:.2f} kg
     Total Phase Fuel Burned: {m_fuel_burned*1000.0:.2f} g
-    Usable Fuel Remaining: {fuel_remaining - ms.mass_reserve:.2f} kg
+    Usable Fuel Remaining: {fuel_remaining:.2f} kg
     Untouched Safety Reserve: {ms.mass_reserve:.2f} kg
     Buffer Battery SoC: {SoC*100.0:.2f} %\n''')
 else:

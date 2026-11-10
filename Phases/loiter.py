@@ -32,7 +32,7 @@ SoC = float(co.SoC)
 endurance = 0.0  # Total elapsed loiter time (s)
 
 fraction_keep = 0.9  # Fuel burn margin for cruise-in
-min_mass_cruisein = ms.m_zfw + ms.mass_reserve + (fraction_keep * co.m_fuel_burned)
+min_mass_cruisein = ms.m_zfw + (fraction_keep * co.m_fuel_burned)
 
 Phase_Success = True
 t_baseline = float(getattr(co, 'cumulative_time', co.t_baseline + co.time_cruise))
@@ -224,7 +224,7 @@ Total Loiter Endurance: {endurance / 3600.0:.2f} hours ({(endurance / 3600.0) * 
   - Sustained ICE Standoff Loiter: {t_ice_loiter_hr:.2f} hours
 Final Aircraft Mass: {m:.2f} kg
 Final Pack SoC: {SoC * 100.0:.2f} % (Safety Floor: {ms.SoC_min * 100.0:.1f}%)
-Usable Fuel Remaining for Cruise-In: {fuel_remaining - ms.mass_reserve:.2f} kg
+Usable Fuel Remaining for Cruise-In: {fuel_remaining:.2f} kg
 Untouched Reserve Fuel: {ms.mass_reserve:.2f} kg
 ''')
 else:

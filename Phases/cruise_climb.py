@@ -153,7 +153,7 @@ if Phase_Success:
     Horizontal Distance Travelled: {s_hor/1000.0:.2f} km
     Final Altitude: {h:.2f} m (Target: {h_target:.1f} m)
     Fuel Burned: {(m_initial - m):.2f} kg
-    Usable Fuel Remaining: {fuel_remaining - ms.mass_reserve:.2f} kg
+    Usable Fuel Remaining: {fuel_remaining:.2f} kg
     Remaining Battery SoC: {SoC*100.0:.2f} %\n''')
 else:
     print(f'''

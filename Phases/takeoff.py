@@ -161,5 +161,5 @@ else:
     Liftoff Velocity (V_LO): {V_LO:.2f} m/s ({V_LO*3.6:.1f} km/h)
     Time to Liftoff: {t:.2f} seconds
     Fuel Burned: {(uav.MTOW - m)*1000.0:.2f} g (Rate: {m_dot_fuel_gps:.2f} g/s)
-    Usable Fuel Remaining: {fuel_remaining - ms.mass_reserve:.2f} kg
+    Usable Fuel Remaining: {fuel_remaining:.2f} kg
     Battery SoC After Takeoff: {SoC*100.0:.2f} %\n''')

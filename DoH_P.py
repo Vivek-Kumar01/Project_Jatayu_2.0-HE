@@ -47,7 +47,7 @@ ms.mass_cells = (ms.battery_capacity * 1000.0) / uav.specific_energy_battery
 ms.mass_battery_pack = uav.k_bat_pack * ms.mass_cells
 
 # Sweep DoH_P from 0.20 to 0.55
-DOH_P_SWEEP = np.linspace(0.20, 0.55, 15)
+DOH_P_SWEEP = np.linspace(0.8, 0.9, 15)
 sweep_records = []
 
 print("=" * 96)

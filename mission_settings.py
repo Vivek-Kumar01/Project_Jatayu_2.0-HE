@@ -10,8 +10,8 @@ reserve_fuel = 0.065 # Reserve fuel fraction for safety
 power_avionics = 0.35 #kW
 
 P_DCDC_rated = 0.50          # kW
-battery_capacity = 22 #kWh
-power_motor = 45 #kW
+battery_capacity = 40 #kWh
+power_motor = 55 #kW
 power_inverter = power_motor #kW
 power_battery_discharge = uav.C_discharge_continuous_safe * battery_capacity #kW
 power_battery_charge = uav.C_charge_continuous_safe * battery_capacity #kW
@@ -56,7 +56,7 @@ else:
   # Mass Breakdown & Aerodynamic Calculations
   mass_reserve = mass_fuel * reserve_fuel
   mass_mission_fuel = mass_fuel - mass_reserve
-  m_zfw = uav.MTOW - mass_fuel  # Zero Fuel Weight
+  m_zfw = uav.MTOW - mass_mission_fuel    # Zero Usable Fuel Weight
   wing_loading = uav.MTOW / uav.S  # kg/m²
   power_loading = uav.MTOW / (
       uav.P_ICE_rated + power_motor
