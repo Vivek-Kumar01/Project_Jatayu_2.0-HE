@@ -32,7 +32,7 @@ mass_fuel = mass_fuel_system / uav.k_fuel_sys #kg
 # if mass_fuel > 0:
 #     print(f'''
 #     ================================================================
-#                             MISSION ARTEMIS
+#                             MISSION JATAYU
 #     ================================================================
 
 #     UAV Charged and Fueled.
