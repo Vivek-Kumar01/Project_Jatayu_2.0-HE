@@ -64,7 +64,7 @@ else:
   ld_max_clean = 1.0 / (2.0 * math.sqrt(uav.Cd_0 * uav.K))
 
   print("=" * 82)
-  print(f"{'PROJECT ARTEMIS: HYBRID UAV CONFIGURATION & SIZING AUDIT':^82}")
+  print(f"{'PROJECT JATAYU: HYBRID UAV CONFIGURATION & SIZING AUDIT':^82}")
   print("=" * 82)
 
   # Category 1: Mass Fractions & Structural Limits
