@@ -1,4 +1,4 @@
-# Project Jatayu — Parallel Hybrid-Electric MALE UAV Mission Simulation
+# Parallel Hybrid-Electric MALE UAV Mission Simulation
 
 Time-marching 11-phase point-mass flight dynamics and powertrain simulation for a **1,000 kg tactical MALE UAV** powered by a **Parallel Hybrid-Electric powertrain** (**50.0 kW CI engine + 55.0 kW direct-drive axial-flux PMSM** with a **40.0 kWh Li-ion battery pack**).
 
